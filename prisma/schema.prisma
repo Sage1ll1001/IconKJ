@@ -1,0 +1,140 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  MINOR
+  GUARDIAN
+  ADMIN
+}
+
+enum TransactionType {
+  BUY
+  SELL
+  DEPOSIT
+  WITHDRAW
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  name      String?
+  role      Role     @default(MINOR)
+  balance   Decimal  @default(0.0)
+  kycStatus String   @default("pending") // pending, verified
+  
+  guardianId String?
+  guardian   User?   @relation("GuardianMinor", fields: [guardianId], references: [id])
+  minors     User[]  @relation("GuardianMinor")
+
+  holdings     Holding[]
+  transactions Transaction[]
+  progress     UserProgress[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Stock {
+  id                 String  @id @default(uuid())
+  symbol             String  @unique
+  name               String
+  description        String?
+  totalShares        Int
+  pricePerShare      Decimal
+  availableFractions Decimal @default(0)
+
+  holdings     Holding[]
+  transactions Transaction[] // Added this relation
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Holding {
+  id        String  @id @default(uuid())
+  userId    String
+  stockId   String
+  quantity  Decimal
+  avgBuyPrice Decimal
+
+  user  User  @relation(fields: [userId], references: [id])
+  stock Stock @relation(fields: [stockId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, stockId])
+}
+
+model Transaction {
+  id        String            @id @default(uuid())
+  userId    String
+  stockId   String?
+  type      TransactionType
+  amount    Decimal
+  price     Decimal?
+  status    TransactionStatus @default(PENDING)
+  
+  user User @relation(fields: [userId], references: [id])
+  stock Stock? @relation(fields: [stockId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+// Education Module
+model Quiz {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  category    String   // e.g., 'Basics', 'Intermediate'
+  questions   Question[]
+  userProgress UserProgress[]
+}
+
+model Question {
+  id        String   @id @default(uuid())
+  quizId    String
+  text      String
+  options   Option[]
+  
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
+}
+
+model Option {
+  id         String   @id @default(uuid())
+  questionId String
+  text       String
+  isCorrect  Boolean
+
+  question   Question @relation(fields: [questionId], references: [id])
+}
+
+model UserProgress {
+  id        String   @id @default(uuid())
+  userId    String
+  quizId    String
+  score     Int
+  completed Boolean  @default(false)
+  
+  user      User     @relation(fields: [userId], references: [id])
+  quiz      Quiz     @relation(fields: [quizId], references: [id])
+
+  completedAt DateTime @default(now())
+
+  @@unique([userId, quizId])
+}
